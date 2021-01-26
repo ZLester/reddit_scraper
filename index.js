@@ -2,106 +2,98 @@ require("dotenv").config();
 const puppeteer = require("puppeteer");
 const REDDIT_URL = "https://www.reddit.com";
 
+// TODO: Use real logger
+const log = (...msgs) => console.log(...msgs);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const log = async (msg, prom) => {
-  console.log(`${msg}: Starting`);
-  const result = await prom;
-  console.log(`${msg}: Completed`);
-  return result;
-};
-
 const crawl = async () => {
-  const browser = await log(
-    "Launch",
-    puppeteer.launch({ headless: false, defaultViewport: false })
-  );
-
+  log("Starting up");
+  const browser = await puppeteer.launch({
+    headless: false,
+    defaultViewport: false,
+  });
   const context = browser.defaultBrowserContext();
+
+  // Turn off Chrome "Show notifications" and "Allow location" popup
   context.overridePermissions(REDDIT_URL, ["geolocation", "notifications"]);
 
-  const page = await log("New Page", browser.newPage());
+  log("Opening New Page");
+  const page = await browser.newPage();
 
-  await log(`Goto ${REDDIT_URL}`, page.goto(REDDIT_URL));
+  log(`Going to ${REDDIT_URL}`);
+  await page.goto(REDDIT_URL);
 
-  const loginButton = await log(
-    `Select loginButton`,
-    page.$(
-      "#SHORTCUT_FOCUSABLE_DIV > div:nth-child(2) > header > div > div._2u8LqkbMtzd0lpblMFbJq5 > div > div._1JBkpB_FOZMZ7IPr3FyNfH > a._3Wg53T10KuuPmyWOMWsY2F._3t7aUZU2b2KWwDQkfT2eHl._2tU8R9NTqhvBrhoNAXWWcP.HNozj_dKjQZ59ZsfEegz8._2nelDm85zKKmuD94NequP0"
-    )
+  log("Getting Login Button");
+  const loginButton = await page.$(
+    "#SHORTCUT_FOCUSABLE_DIV > div:nth-child(2) > header > div > div._2u8LqkbMtzd0lpblMFbJq5 > div > div._1JBkpB_FOZMZ7IPr3FyNfH > a._3Wg53T10KuuPmyWOMWsY2F._3t7aUZU2b2KWwDQkfT2eHl._2tU8R9NTqhvBrhoNAXWWcP.HNozj_dKjQZ59ZsfEegz8._2nelDm85zKKmuD94NequP0"
   );
 
-  await log(`Click loginButton`, loginButton.click());
+  log("Clicking Login Button");
+  await loginButton.click();
 
-  await log(
-    "WaitForSelector iframe",
-    page.waitForSelector("iframe", { visible: true })
+  log("Waiting for login iframe to be visible");
+  await page.waitForSelector("iframe", { visible: true });
+
+  log("Getting iframe handle");
+  const iframeHandle = await page.$(
+    `iframe[src="https://www.reddit.com/login/?experiment_d2x_2020ify_buttons=enabled&experiment_d2x_sso_login_link=enabled"]`
   );
 
-  const iframeHandle = await log(
-    `Select iframe`,
-    page.$(
-      `iframe[src="https://www.reddit.com/login/?experiment_d2x_2020ify_buttons=enabled&experiment_d2x_sso_login_link=enabled"]`
-    )
-  );
-  const iframe = await log(
-    "iframeHandle contentFrame",
-    iframeHandle.contentFrame()
-  );
+  log("Getting iframe content");
+  const iframe = await iframeHandle.contentFrame();
 
-  await log(
-    "waiting for login field to be visible",
-    iframe.waitForSelector("#loginUsername", { visible: true })
-  );
+  log("Waiting for username field to be visible");
+  await iframe.waitForSelector("#loginUsername", { visible: true });
 
-  await log("Sleeping 2 seconds", sleep(2000));
+  log("Sleeping 2 seconds");
+  await sleep(2000);
 
+  log("Typing username");
   // Regular iframe.type or focus + page.keyboard.type won't work for some reason
-  await log(
-    "Typing username",
-    iframe.$eval(
-      "#loginUsername",
-      (el, value) => {
-        el.value = value;
-      },
-      process.env.REDDIT_USERNAME
-    )
+  await iframe.$eval(
+    "#loginUsername",
+    (el, value) => {
+      el.value = value;
+    },
+    process.env.REDDIT_USERNAME
   );
 
-  await log(
-    "Typing password",
-    iframe.$eval(
-      "#loginPassword",
-      (el, value) => {
-        el.value = value;
-      },
-      process.env.REDDIT_PASSWORD
-    )
+  log("Typing password");
+  await iframe.$eval(
+    "#loginPassword",
+    (el, value) => {
+      el.value = value;
+    },
+    process.env.REDDIT_PASSWORD
   );
 
-  const loginFormButton = await log(
-    "Select loginFormButton",
-    iframe.$(
-      "body > div > main > div.OnboardingStep.Onboarding__step.mode-auth > div > div.Step__content > form > fieldset:nth-child(10) > button"
-    )
+  log("Selecting Login Form Button");
+  const loginFormButton = await iframe.$(
+    "body > div > main > div.OnboardingStep.Onboarding__step.mode-auth > div > div.Step__content > form > fieldset:nth-child(10) > button"
   );
 
-  await log(`Click loginFormButton`, loginFormButton.click());
+  log("Clicking Login Form Button");
+  await loginFormButton.click();
 
-  await log(
-    "Waiting for login modal to be hidden",
-    page.waitForFunction(
-      () =>
-        !document.querySelector(
-          `iframe[src="https://www.reddit.com/login/?experiment_d2x_2020ify_buttons=enabled&experiment_d2x_sso_login_link=enabled"]`
-        ),
-      {
-        polling: "mutation",
-      }
-    )
+  log("Waiting for iframe to be hidden");
+  await page.waitForFunction(
+    () =>
+      !document.querySelector(
+        `iframe[src="https://www.reddit.com/login/?experiment_d2x_2020ify_buttons=enabled&experiment_d2x_sso_login_link=enabled"]`
+      ),
+    {
+      polling: "mutation",
+    }
   );
-  await log("Taking screenshot", page.screenshot({ path: "screenshot.png" }));
-  await log("Shut down", browser.close());
+
+  log("Sleeping 2 seconds");
+  await sleep(2000);
+
+  log("Taking screenshot");
+  await page.screenshot({ path: "screenshot.png" });
+
+  log("Shutting down");
+  await browser.close();
 };
 
 crawl();
