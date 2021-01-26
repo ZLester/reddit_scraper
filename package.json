@@ -1,0 +1,16 @@
+{
+  "name": "reddit-scraper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.5",
+    "dotenv": "^8.2.0",
+    "puppeteer": "^5.5.0"
+  }
+}
